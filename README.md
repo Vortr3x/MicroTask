@@ -23,7 +23,7 @@ MicroTask records mouse and keyboard input directly from Linux kernel event inte
 | --- | --- |
 | `F9` | Start / Stop recording |
 | `F10` | Play / Pause / Resume playback |
-| `F11` or `Escape` | Emergency stop (release all held keys and stop) |
+| `Pause` or `F12` | Emergency stop (release all held keys and stop) |
 
 ## Permissions & Setup
 

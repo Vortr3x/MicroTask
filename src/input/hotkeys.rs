@@ -97,7 +97,7 @@ fn run_hotkey_loop(
     }
 
     info!(
-        "Global Hotkey Daemon running across {} keyboards (F9: Record, F10: Play, F11/Esc: Panic)",
+        "Global Hotkey Daemon running across {} keyboards (F9: Record, F10: Play, Pause/F12: Panic)",
         devices.len()
     );
 
@@ -149,7 +149,10 @@ fn run_hotkey_loop(
                             } else if code == config.play_toggle_code {
                                 info!("Global hotkey: PLAY TOGGLE ({})", code);
                                 let _ = sender.send(HotkeyAction::PlayToggle);
-                            } else if code == config.panic_abort_code || code == 1 /* ESC */ {
+                            } else if code == config.panic_abort_code
+                                || (config.panic_abort_code == 119 && code == 88)
+                                || (config.panic_abort_code == 88 && code == 119)
+                            {
                                 info!("Global hotkey: PANIC STOP ({})", code);
                                 let _ = sender.send(HotkeyAction::PanicStop);
                             }

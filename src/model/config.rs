@@ -116,7 +116,7 @@ pub struct HotkeyConfig {
     pub record_toggle_code: u16,
     /// Global hotkey to toggle playback (default: F10 = 68)
     pub play_toggle_code: u16,
-    /// Global hotkey to abort / panic stop (default: F11 = 87, Esc = 1 is also always checked)
+    /// Global hotkey to abort / panic stop (default: Pause = 119, or F12 = 88)
     pub panic_abort_code: u16,
     /// Enable background keyboard daemon
     pub enabled: bool,
@@ -127,7 +127,7 @@ impl Default for HotkeyConfig {
         Self {
             record_toggle_code: 67, // KEY_F9
             play_toggle_code: 68,   // KEY_F10
-            panic_abort_code: 87,   // KEY_F11
+            panic_abort_code: 119,  // KEY_PAUSE (safe from accidental Esc / F11 triggers)
             enabled: true,
         }
     }

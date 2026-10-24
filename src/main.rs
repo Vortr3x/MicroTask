@@ -26,7 +26,7 @@ fn main() -> eframe::Result<()> {
         println!("GLOBAL HOTKEYS:");
         println!("    F9                   Toggle Recording (Start / Stop)");
         println!("    F10                  Toggle Playback (Play / Pause / Resume)");
-        println!("    F11 or Escape        Emergency Panic Stop (Immediately releases all held keys/buttons)");
+        println!("    Pause or F12         Emergency Panic Stop (Immediately releases all held keys/buttons)");
         println!();
         println!("WAYLAND CORNER ANCHOR:");
         println!("    Wayland strictly blocks synthetic absolute cursor warps.");

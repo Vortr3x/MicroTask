@@ -208,6 +208,7 @@ pub fn key_code_to_name(code: u16) -> String {
         66 => "F8".to_string(),
         67 => "F9".to_string(),
         68 => "F10".to_string(),
+        70 => "Scroll Lock".to_string(),
         87 => "F11".to_string(),
         88 => "F12".to_string(),
         97 => "Right Ctrl".to_string(),
@@ -222,6 +223,7 @@ pub fn key_code_to_name(code: u16) -> String {
         109 => "Page Down".to_string(),
         110 => "Insert".to_string(),
         111 => "Delete".to_string(),
+        119 => "Pause / Break".to_string(),
         125 => "Super/Meta".to_string(),
         other => {
             // Fallback to evdev KeyCode debug name

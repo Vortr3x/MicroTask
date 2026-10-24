@@ -333,7 +333,7 @@ impl MicroTaskApp {
                 } else {
                     String::new()
                 };
-                self.set_notification(format!("Macro playback started.{} Press F11 or Esc to abort.", anchor_str), false);
+                self.set_notification(format!("Macro playback started.{} Press Pause or F12 to abort.", anchor_str), false);
                 info!("Playback started");
             }
             Err(e) => {
@@ -587,7 +587,7 @@ impl MicroTaskApp {
                 let stop_btn = action_button(
                     ui,
                     "⏹",
-                    "Panic (F11/Esc)",
+                    "Panic (Pause/F12)",
                     if is_active {
                         Color32::from_rgb(185, 28, 28)
                     } else {
@@ -1156,7 +1156,27 @@ impl MicroTaskApp {
 
                         ui.add_space(16.0);
                         ui.label(RichText::new("Emergency Panic:").strong());
-                        ui.label(RichText::new("F11 or Escape").monospace().color(Color32::from_rgb(239, 68, 68)));
+                        let current_panic = self.hotkey_config.panic_abort_code;
+                        let panic_label = match current_panic {
+                            119 => "Pause / Break",
+                            88 => "F12",
+                            70 => "Scroll Lock",
+                            66 => "F8",
+                            _other => "Custom",
+                        };
+                        let mut selected_panic = current_panic;
+                        egui::ComboBox::from_id_salt("panic_hotkey_select")
+                            .selected_text(panic_label)
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut selected_panic, 119, "Pause / Break (Recommended)");
+                                ui.selectable_value(&mut selected_panic, 88, "F12");
+                                ui.selectable_value(&mut selected_panic, 70, "Scroll Lock");
+                                ui.selectable_value(&mut selected_panic, 66, "F8");
+                            });
+                        if selected_panic != current_panic {
+                            self.hotkey_config.panic_abort_code = selected_panic;
+                            self.save_settings();
+                        }
                     });
                 });
 
@@ -1426,7 +1446,7 @@ impl MicroTaskApp {
                 );
             } else {
                 ui.label(
-                    RichText::new("Hotkeys: [F9] Record  |  [F10] Play  |  [F11 / Esc] Panic Stop")
+                    RichText::new("Hotkeys: [F9] Record  |  [F10] Play  |  [Pause / F12] Panic Stop")
                         .size(11.0)
                         .color(Color32::from_rgb(156, 163, 175)),
                 );

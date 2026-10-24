@@ -71,6 +71,8 @@ fn test_key_code_to_name_translation() {
     assert_eq!(key_code_to_name(67), "F9");
     assert_eq!(key_code_to_name(68), "F10");
     assert_eq!(key_code_to_name(87), "F11");
+    assert_eq!(key_code_to_name(88), "F12");
+    assert_eq!(key_code_to_name(119), "Pause / Break");
 }
 
 #[test]
