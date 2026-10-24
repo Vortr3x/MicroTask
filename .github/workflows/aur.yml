@@ -15,9 +15,7 @@ jobs:
 
       - name: Publish microtask to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v3.0.1
-        if: env.AUR_KEY != ''
-        env:
-          AUR_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        if: "${{ secrets.AUR_SSH_PRIVATE_KEY != '' }}"
         with:
           pkgname: microtask
           pkgbuild: aur/PKGBUILD

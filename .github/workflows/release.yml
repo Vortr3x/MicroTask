@@ -83,11 +83,7 @@ jobs:
           cp assets/microtask.png AppDir/usr/share/icons/hicolor/256x256/apps/
           cp assets/99-uinput.rules AppDir/usr/lib/udev/rules.d/
 
-          cat << 'EOF' > AppDir/AppRun
-#!/bin/sh
-HERE="$(dirname "$(readlink -f "${0}")")"
-exec "${HERE}/usr/bin/microtask" "$@"
-EOF
+          printf '#!/bin/sh\nHERE="$(dirname "$(readlink -f "$0")")"\nexec "$HERE/usr/bin/microtask" "$@"\n' > AppDir/AppRun
           chmod +x AppDir/AppRun
 
           # Build AppImage
@@ -95,7 +91,7 @@ EOF
 
       - name: Generate Checksums
         run: |
-          sha256sum ${{ env.TARBALL }} ${{ env.DEB_PACKAGE }} MicroTask-x86_64.AppImage > SHA256SUMS.txt
+          sha256sum *.tar.gz *.deb MicroTask-x86_64.AppImage > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Create GitHub Release
@@ -108,7 +104,8 @@ EOF
           prerelease: false
           generate_release_notes: true
           files: |
-            ${{ env.TARBALL }}
-            ${{ env.DEB_PACKAGE }}
+            *.tar.gz
+            *.deb
             MicroTask-x86_64.AppImage
             SHA256SUMS.txt
+
