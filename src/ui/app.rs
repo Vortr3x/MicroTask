@@ -7,7 +7,7 @@ use crate::input::hotkeys::{HotkeyAction, HotkeyDaemon, HotkeyDaemonHandle};
 use crate::input::player::{MacroPlayer, PlaybackProgress, PlayerHandle};
 use crate::input::recorder::{InputRecorder, RecorderHandle};
 use crate::model::config::{AnchorMethod, AnchorMode, HotkeyConfig, MacroData, PlaybackConfig};
-use crate::model::event::{EventType, KeyState, MacroEvent};
+use crate::model::event::{key_code_to_name, EventType, KeyState, MacroEvent};
 use crate::storage::config_storage::{
     get_settings_path, load_app_settings, save_app_settings, AppSettings,
 };
@@ -34,6 +34,77 @@ pub enum EngineState {
     Paused,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HotkeyTarget {
+    Record,
+    Play,
+    Panic,
+}
+
+pub fn egui_key_to_evdev(key: egui::Key) -> Option<u16> {
+    match key {
+        egui::Key::F1 => Some(59),
+        egui::Key::F2 => Some(60),
+        egui::Key::F3 => Some(61),
+        egui::Key::F4 => Some(62),
+        egui::Key::F5 => Some(63),
+        egui::Key::F6 => Some(64),
+        egui::Key::F7 => Some(65),
+        egui::Key::F8 => Some(66),
+        egui::Key::F9 => Some(67),
+        egui::Key::F10 => Some(68),
+        egui::Key::F11 => Some(87),
+        egui::Key::F12 => Some(88),
+        egui::Key::Space => Some(57),
+        egui::Key::Tab => Some(15),
+        egui::Key::Enter => Some(28),
+        egui::Key::Backspace => Some(14),
+        egui::Key::Insert => Some(110),
+        egui::Key::Delete => Some(111),
+        egui::Key::Home => Some(102),
+        egui::Key::End => Some(107),
+        egui::Key::PageUp => Some(104),
+        egui::Key::PageDown => Some(109),
+        egui::Key::A => Some(30),
+        egui::Key::B => Some(48),
+        egui::Key::C => Some(46),
+        egui::Key::D => Some(32),
+        egui::Key::E => Some(18),
+        egui::Key::F => Some(33),
+        egui::Key::G => Some(34),
+        egui::Key::H => Some(35),
+        egui::Key::I => Some(23),
+        egui::Key::J => Some(36),
+        egui::Key::K => Some(37),
+        egui::Key::L => Some(38),
+        egui::Key::M => Some(50),
+        egui::Key::N => Some(49),
+        egui::Key::O => Some(24),
+        egui::Key::P => Some(25),
+        egui::Key::Q => Some(16),
+        egui::Key::R => Some(19),
+        egui::Key::S => Some(31),
+        egui::Key::T => Some(20),
+        egui::Key::U => Some(22),
+        egui::Key::V => Some(47),
+        egui::Key::W => Some(17),
+        egui::Key::X => Some(45),
+        egui::Key::Y => Some(21),
+        egui::Key::Z => Some(44),
+        egui::Key::Num0 => Some(11),
+        egui::Key::Num1 => Some(2),
+        egui::Key::Num2 => Some(3),
+        egui::Key::Num3 => Some(4),
+        egui::Key::Num4 => Some(5),
+        egui::Key::Num5 => Some(6),
+        egui::Key::Num6 => Some(7),
+        egui::Key::Num7 => Some(8),
+        egui::Key::Num8 => Some(9),
+        egui::Key::Num9 => Some(10),
+        _ => None,
+    }
+}
+
 pub struct MicroTaskApp {
     // Macro data
     pub macro_data: MacroData,
@@ -53,10 +124,13 @@ pub struct MicroTaskApp {
     pub notification_banner: Option<(String, bool, Instant)>, // (message, is_error, timestamp)
     pub selected_event_idx: Option<usize>,
 
+    // Hotkey binding capture
+    pub listening_for_hotkey: Option<HotkeyTarget>,
+
     // Channels & Handles
     recorder_handle: Option<RecorderHandle>,
     player_handle: Option<PlayerHandle>,
-    _hotkey_handle: Option<HotkeyDaemonHandle>,
+    pub hotkey_handle: Option<HotkeyDaemonHandle>,
 
     event_rx: crossbeam_channel::Receiver<MacroEvent>,
     event_tx: crossbeam_channel::Sender<MacroEvent>,
@@ -97,9 +171,11 @@ impl MicroTaskApp {
             (settings.playback, settings.hotkeys, settings.disabled_device_names)
         } else {
             info!("No saved settings found, initializing default configuration");
-            let mut default_pb = PlaybackConfig::default();
-            default_pb.anchor_x = scr_w / 2;
-            default_pb.anchor_y = scr_h / 2;
+            let default_pb = PlaybackConfig {
+                anchor_x: scr_w / 2,
+                anchor_y: scr_h / 2,
+                ..PlaybackConfig::default()
+            };
             (default_pb, HotkeyConfig::default(), Vec::new())
         };
 
@@ -140,9 +216,10 @@ impl MicroTaskApp {
             playback_progress: None,
             notification_banner: None,
             selected_event_idx: None,
+            listening_for_hotkey: None,
             recorder_handle: None,
             player_handle: None,
-            _hotkey_handle: hotkey_handle,
+            hotkey_handle,
             event_rx,
             event_tx,
             progress_rx,
@@ -186,10 +263,11 @@ impl MicroTaskApp {
     /// Resets all settings to factory defaults
     pub fn reset_to_defaults(&mut self) {
         let (scr_w, scr_h) = detect_screen_resolution();
-        let mut pb = PlaybackConfig::default();
-        pb.anchor_x = scr_w / 2;
-        pb.anchor_y = scr_h / 2;
-        self.playback_config = pb;
+        self.playback_config = PlaybackConfig {
+            anchor_x: scr_w / 2,
+            anchor_y: scr_h / 2,
+            ..PlaybackConfig::default()
+        };
         self.hotkey_config = HotkeyConfig::default();
         for dev in &mut self.detected_devices {
             dev.enabled = true;
@@ -259,7 +337,8 @@ impl MicroTaskApp {
             Ok(handle) => {
                 self.recorder_handle = Some(handle);
                 self.state = EngineState::Recording;
-                self.set_notification(format!("Recording started...{} Press F9 to stop", anchor_notice), false);
+                let rec_name = key_code_to_name(self.hotkey_config.record_toggle_code);
+                self.set_notification(format!("Recording started...{} Press {} to stop", anchor_notice, rec_name), false);
                 info!("Recording started");
             }
             Err(e) => {
@@ -333,7 +412,8 @@ impl MicroTaskApp {
                 } else {
                     String::new()
                 };
-                self.set_notification(format!("Macro playback started.{} Press Pause or F12 to abort.", anchor_str), false);
+                let panic_name = key_code_to_name(self.hotkey_config.panic_abort_code);
+                self.set_notification(format!("Macro playback started.{} Press {} to abort.", anchor_str, panic_name), false);
                 info!("Playback started");
             }
             Err(e) => {
@@ -388,6 +468,7 @@ impl MicroTaskApp {
                 HotkeyAction::RecordToggle => self.toggle_recording(),
                 HotkeyAction::PlayToggle => self.toggle_playback(),
                 HotkeyAction::PanicStop => self.emergency_panic_stop(),
+                HotkeyAction::RawKeyPressed(code) => self.handle_captured_key(code),
             }
         }
 
@@ -450,6 +531,145 @@ impl MicroTaskApp {
         self.macro_data = MacroData::new("Sample Demo Pattern", events);
         self.set_notification("Loaded sample demonstration macro (Square cursor motion + Clicks)", false);
     }
+    pub fn start_hotkey_listening(&mut self, target: HotkeyTarget) {
+        self.listening_for_hotkey = Some(target);
+        if let Some(handle) = &self.hotkey_handle {
+            handle.set_capture_mode(true);
+        }
+    }
+
+    pub fn cancel_hotkey_listening(&mut self) {
+        self.listening_for_hotkey = None;
+        if let Some(handle) = &self.hotkey_handle {
+            handle.set_capture_mode(false);
+        }
+    }
+
+    pub fn assign_hotkey(&mut self, target: HotkeyTarget, code: u16) {
+        let key_name = key_code_to_name(code);
+        match target {
+            HotkeyTarget::Record => {
+                self.hotkey_config.record_toggle_code = code;
+                self.set_notification(format!("Record Toggle hotkey set to {}", key_name), false);
+            }
+            HotkeyTarget::Play => {
+                self.hotkey_config.play_toggle_code = code;
+                self.set_notification(format!("Playback Toggle hotkey set to {}", key_name), false);
+            }
+            HotkeyTarget::Panic => {
+                self.hotkey_config.panic_abort_code = code;
+                self.set_notification(format!("Emergency Panic hotkey set to {}", key_name), false);
+            }
+        }
+
+        if let Some(handle) = &self.hotkey_handle {
+            handle.update_config(self.hotkey_config.clone());
+        }
+        self.save_settings();
+    }
+
+    pub fn handle_captured_key(&mut self, code: u16) {
+        if let Some(target) = self.listening_for_hotkey.take() {
+            if let Some(handle) = &self.hotkey_handle {
+                handle.set_capture_mode(false);
+            }
+
+            // Escape cancels
+            if code == 1 {
+                self.set_notification("Key binding cancelled.", false);
+                return;
+            }
+
+            self.assign_hotkey(target, code);
+        }
+    }
+
+    fn render_hotkey_row(
+        &mut self,
+        ui: &mut egui::Ui,
+        title: &str,
+        desc: &str,
+        target: HotkeyTarget,
+        current_code: u16,
+        accent_color: Color32,
+    ) {
+        let is_listening = self.listening_for_hotkey == Some(target);
+        let key_name = key_code_to_name(current_code);
+
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(title).strong());
+                    if is_listening {
+                        ui.label(
+                            RichText::new("🔴 Press any key on keyboard...")
+                                .strong()
+                                .color(Color32::from_rgb(239, 68, 68)),
+                        );
+                    } else {
+                        ui.label(
+                            RichText::new(format!("[ {} ]", key_name))
+                                .monospace()
+                                .strong()
+                                .color(accent_color),
+                        );
+                    }
+                });
+                ui.label(RichText::new(desc).size(10.5).color(Color32::from_rgb(156, 163, 175)));
+            });
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                // Preset ComboBox
+                let mut selected_code = current_code;
+                egui::ComboBox::from_id_salt(format!("combo_{:?}", target))
+                    .selected_text(&key_name)
+                    .show_ui(ui, |ui| {
+                        ui.label(RichText::new("— Function Keys —").size(10.0).color(Color32::GRAY));
+                        for (code, name) in &[
+                            (59, "F1"), (60, "F2"), (61, "F3"), (62, "F4"),
+                            (63, "F5"), (64, "F6"), (65, "F7"), (66, "F8"),
+                            (67, "F9"), (68, "F10"), (87, "F11"), (88, "F12"),
+                        ] {
+                            ui.selectable_value(&mut selected_code, *code, *name);
+                        }
+                        ui.separator();
+                        ui.label(RichText::new("— Special & Navigation —").size(10.0).color(Color32::GRAY));
+                        for (code, name) in &[
+                            (119, "Pause / Break"), (70, "Scroll Lock"),
+                            (110, "Insert"), (111, "Delete"),
+                            (102, "Home"), (107, "End"),
+                            (104, "Page Up"), (109, "Page Down"),
+                        ] {
+                            ui.selectable_value(&mut selected_code, *code, *name);
+                        }
+                        ui.separator();
+                        ui.label(RichText::new("— Common —").size(10.0).color(Color32::GRAY));
+                        for (code, name) in &[
+                            (57, "Space"), (15, "Tab"),
+                        ] {
+                            ui.selectable_value(&mut selected_code, *code, *name);
+                        }
+                    });
+
+                if selected_code != current_code {
+                    self.assign_hotkey(target, selected_code);
+                }
+
+                ui.add_space(6.0);
+
+                // Bind / Listening Button
+                if is_listening {
+                    if ui.button(RichText::new("✖ Cancel").color(Color32::from_rgb(239, 68, 68))).clicked() {
+                        self.cancel_hotkey_listening();
+                    }
+                } else {
+                    if ui.button(RichText::new("⌨ Bind Key").color(Color32::from_rgb(226, 232, 240))).clicked() {
+                        self.start_hotkey_listening(target);
+                    }
+                }
+            });
+        });
+    }
 }
 
 impl Drop for MicroTaskApp {
@@ -463,6 +683,29 @@ use egui::containers::panel::{CentralPanel, Panel};
 impl eframe::App for MicroTaskApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.process_channels();
+
+        // If listening for a hotkey, intercept egui window events and request continuous repaint
+        if self.listening_for_hotkey.is_some() {
+            ui.ctx().request_repaint();
+
+            let captured_code = ui.input(|i| {
+                if i.key_pressed(egui::Key::Escape) {
+                    return Some(1); // Escape cancels
+                }
+                for event in &i.events {
+                    if let egui::Event::Key { key, pressed: true, repeat: false, .. } = event {
+                        if let Some(code) = egui_key_to_evdev(*key) {
+                            return Some(code);
+                        }
+                    }
+                }
+                None
+            });
+
+            if let Some(code) = captured_code {
+                self.handle_captured_key(code);
+            }
+        }
 
         // Request continuous repaint while recording or playing to keep timers and progress smooth
         if self.state == EngineState::Recording || self.state == EngineState::Playing {
@@ -582,12 +825,16 @@ impl MicroTaskApp {
 
             // Right-aligned Action Controls
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let rec_key_name = key_code_to_name(self.hotkey_config.record_toggle_code);
+                let play_key_name = key_code_to_name(self.hotkey_config.play_toggle_code);
+                let panic_key_name = key_code_to_name(self.hotkey_config.panic_abort_code);
+
                 // Emergency Stop Button
                 let is_active = self.state != EngineState::Idle;
                 let stop_btn = action_button(
                     ui,
                     "⏹",
-                    "Panic (Pause/F12)",
+                    &format!("Panic ({})", panic_key_name),
                     if is_active {
                         Color32::from_rgb(185, 28, 28)
                     } else {
@@ -603,14 +850,14 @@ impl MicroTaskApp {
 
                 // Play / Pause Button
                 let (play_icon, play_label, play_bg) = match self.state {
-                    EngineState::Playing => ("⏸", "Pause (F10)", Color32::from_rgb(217, 119, 6)),
-                    EngineState::Paused => ("▶", "Resume (F10)", Color32::from_rgb(16, 185, 129)),
-                    _ => ("▶", "Play (F10)", Color32::from_rgb(16, 185, 129)),
+                    EngineState::Playing => ("⏸", format!("Pause ({})", play_key_name), Color32::from_rgb(217, 119, 6)),
+                    EngineState::Paused => ("▶", format!("Resume ({})", play_key_name), Color32::from_rgb(16, 185, 129)),
+                    _ => ("▶", format!("Play ({})", play_key_name), Color32::from_rgb(16, 185, 129)),
                 };
                 let play_btn = action_button(
                     ui,
                     play_icon,
-                    play_label,
+                    &play_label,
                     play_bg,
                     self.state == EngineState::Playing,
                 );
@@ -622,14 +869,14 @@ impl MicroTaskApp {
 
                 // Record Button
                 let (rec_icon, rec_label, rec_bg) = if self.state == EngineState::Recording {
-                    ("⏹", "Stop (F9)", Color32::from_rgb(220, 38, 38))
+                    ("⏹", format!("Stop ({})", rec_key_name), Color32::from_rgb(220, 38, 38))
                 } else {
-                    ("⏺", "Record (F9)", Color32::from_rgb(190, 24, 93))
+                    ("⏺", format!("Record ({})", rec_key_name), Color32::from_rgb(190, 24, 93))
                 };
                 let rec_btn = action_button(
                     ui,
                     rec_icon,
-                    rec_label,
+                    &rec_label,
                     rec_bg,
                     self.state == EngineState::Recording,
                 );
@@ -1129,53 +1376,78 @@ impl MicroTaskApp {
 
                 ui.add_space(10.0);
 
-                // Global Hotkeys Info
+                // Global Hotkeys Configuration
                 ui.group(|ui| {
-                    ui.label(
-                        RichText::new("Global Hardware Shortcuts")
-                            .strong()
-                            .color(Color32::from_rgb(192, 132, 252)),
-                    );
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new("⌨ Global Hotkeys Configuration")
+                                .strong()
+                                .color(Color32::from_rgb(56, 189, 248)),
+                        );
+                        if self.listening_for_hotkey.is_some() {
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.button(RichText::new("✖ Cancel Binding").color(Color32::from_rgb(239, 68, 68))).clicked() {
+                                    self.cancel_hotkey_listening();
+                                }
+                            });
+                        }
+                    });
                     ui.add_space(4.0);
                     ui.label(
                         RichText::new(
-                            "Global hotkeys listen directly to keyboard kernel nodes under /dev/input/event*, \
-                            functioning globally even when MicroTask is completely unfocused, minimized, or behind full-screen games."
+                            "Configure global shortcuts. Click 'Bind Key' to capture any keypress from anywhere on your system, or select from presets."
                         )
                         .size(11.0)
                         .color(Color32::from_rgb(156, 163, 175)),
                     );
-                    ui.add_space(6.0);
+                    ui.add_space(8.0);
+
+                    self.render_hotkey_row(
+                        ui,
+                        "Record Toggle",
+                        "Starts or stops recording input events from any window",
+                        HotkeyTarget::Record,
+                        self.hotkey_config.record_toggle_code,
+                        Color32::from_rgb(56, 189, 248),
+                    );
+
+                    ui.add_space(4.0);
+                    ui.separator();
+                    ui.add_space(4.0);
+
+                    self.render_hotkey_row(
+                        ui,
+                        "Playback Toggle",
+                        "Starts, pauses, or resumes replaying the current macro",
+                        HotkeyTarget::Play,
+                        self.hotkey_config.play_toggle_code,
+                        Color32::from_rgb(52, 211, 153),
+                    );
+
+                    ui.add_space(4.0);
+                    ui.separator();
+                    ui.add_space(4.0);
+
+                    self.render_hotkey_row(
+                        ui,
+                        "Emergency Panic",
+                        "Instantly halts playback and releases all held keyboard/mouse buttons",
+                        HotkeyTarget::Panic,
+                        self.hotkey_config.panic_abort_code,
+                        Color32::from_rgb(239, 68, 68),
+                    );
+
+                    ui.add_space(8.0);
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Record Toggle:").strong());
-                        ui.label(RichText::new("F9").monospace().color(Color32::from_rgb(56, 189, 248)));
-
-                        ui.add_space(16.0);
-                        ui.label(RichText::new("Playback Toggle:").strong());
-                        ui.label(RichText::new("F10").monospace().color(Color32::from_rgb(52, 211, 153)));
-
-                        ui.add_space(16.0);
-                        ui.label(RichText::new("Emergency Panic:").strong());
-                        let current_panic = self.hotkey_config.panic_abort_code;
-                        let panic_label = match current_panic {
-                            119 => "Pause / Break",
-                            88 => "F12",
-                            70 => "Scroll Lock",
-                            66 => "F8",
-                            _other => "Custom",
-                        };
-                        let mut selected_panic = current_panic;
-                        egui::ComboBox::from_id_salt("panic_hotkey_select")
-                            .selected_text(panic_label)
-                            .show_ui(ui, |ui| {
-                                ui.selectable_value(&mut selected_panic, 119, "Pause / Break (Recommended)");
-                                ui.selectable_value(&mut selected_panic, 88, "F12");
-                                ui.selectable_value(&mut selected_panic, 70, "Scroll Lock");
-                                ui.selectable_value(&mut selected_panic, 66, "F8");
-                            });
-                        if selected_panic != current_panic {
-                            self.hotkey_config.panic_abort_code = selected_panic;
+                        if ui.button("🔄 Reset Hotkeys to Defaults (F9 / F10 / Pause)").clicked() {
+                            self.hotkey_config.record_toggle_code = 67;
+                            self.hotkey_config.play_toggle_code = 68;
+                            self.hotkey_config.panic_abort_code = 119;
+                            if let Some(h) = &self.hotkey_handle {
+                                h.update_config(self.hotkey_config.clone());
+                            }
                             self.save_settings();
+                            self.set_notification("Hotkeys reset to defaults: F9, F10, Pause", false);
                         }
                     });
                 });
@@ -1445,8 +1717,11 @@ impl MicroTaskApp {
                     .color(Color32::from_rgb(239, 68, 68)),
                 );
             } else {
+                let rec_k = key_code_to_name(self.hotkey_config.record_toggle_code);
+                let play_k = key_code_to_name(self.hotkey_config.play_toggle_code);
+                let panic_k = key_code_to_name(self.hotkey_config.panic_abort_code);
                 ui.label(
-                    RichText::new("Hotkeys: [F9] Record  |  [F10] Play  |  [Pause / F12] Panic Stop")
+                    RichText::new(format!("Hotkeys: [{}] Record  |  [{}] Play  |  [{}] Panic Stop", rec_k, play_k, panic_k))
                         .size(11.0)
                         .color(Color32::from_rgb(156, 163, 175)),
                 );

@@ -131,7 +131,7 @@ pub fn event_row(
 
     let row_bg = if selected {
         Color32::from_rgb(38, 48, 68)
-    } else if index % 2 == 0 {
+    } else if index.is_multiple_of(2) {
         Color32::from_rgb(22, 26, 36)
     } else {
         Color32::from_rgb(18, 22, 30)

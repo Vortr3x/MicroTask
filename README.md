@@ -25,6 +25,9 @@ MicroTask records mouse and keyboard input directly from Linux kernel event inte
 | `F10` | Play / Pause / Resume playback |
 | `Pause` or `F12` | Emergency stop (release all held keys and stop) |
 
+All hotkeys are fully customizable in the **Settings** tab. You can interactively bind any keypress via the "Bind Key" button or select from common presets.
+
+
 ## Permissions & Setup
 
 MicroTask interacts directly with the Linux input subsystem. Your user account must have permissions to read `/dev/input/event*` and write to `/dev/uinput`.

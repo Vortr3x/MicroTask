@@ -210,4 +210,31 @@ fn test_app_settings_persistence() {
     let _ = fs::remove_file(temp_file);
 }
 
+#[test]
+fn test_custom_hotkeys_and_egui_mapping() {
+    use microtask::ui::app::egui_key_to_evdev;
+    use microtask::model::config::HotkeyConfig;
+    use eframe::egui::Key;
+
+    assert_eq!(egui_key_to_evdev(Key::F1), Some(59));
+    assert_eq!(egui_key_to_evdev(Key::F7), Some(65));
+    assert_eq!(egui_key_to_evdev(Key::F9), Some(67));
+    assert_eq!(egui_key_to_evdev(Key::F10), Some(68));
+    assert_eq!(egui_key_to_evdev(Key::F12), Some(88));
+    assert_eq!(egui_key_to_evdev(Key::Space), Some(57));
+
+    let mut cfg = HotkeyConfig::default();
+    assert_eq!(cfg.record_toggle_code, 67);
+    assert_eq!(cfg.play_toggle_code, 68);
+    assert_eq!(cfg.panic_abort_code, 119);
+
+    cfg.record_toggle_code = 65;
+    cfg.play_toggle_code = 66;
+    cfg.panic_abort_code = 88;
+
+    assert_eq!(key_code_to_name(cfg.record_toggle_code), "F7");
+    assert_eq!(key_code_to_name(cfg.play_toggle_code), "F8");
+    assert_eq!(key_code_to_name(cfg.panic_abort_code), "F12");
+}
+
 

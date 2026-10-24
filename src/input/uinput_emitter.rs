@@ -42,12 +42,12 @@ impl UinputEmitter {
         rel_axes.insert(RelativeAxisCode::REL_HWHEEL);
 
         let device = VirtualDevice::builder()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+            .map_err(io::Error::other)?
             .name(VIRTUAL_DEVICE_NAME)
             .with_keys(&keys)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+            .map_err(io::Error::other)?
             .with_relative_axes(&rel_axes)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+            .map_err(io::Error::other)?
             .build()
             .map_err(|e| {
                 error!("Failed to create uinput virtual device: {}", e);

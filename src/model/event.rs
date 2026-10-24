@@ -8,11 +8,11 @@ pub enum KeyState {
 }
 
 impl KeyState {
-    pub fn is_press(&self) -> bool {
+    pub fn is_press(self) -> bool {
         matches!(self, KeyState::Press)
     }
 
-    pub fn to_i32(&self) -> i32 {
+    pub fn to_i32(self) -> i32 {
         match self {
             KeyState::Press => 1,
             KeyState::Release => 0,

@@ -1,38 +1,28 @@
 use super::event::MacroEvent;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum AnchorMode {
     /// Pure relative, no starting position synchronization
     Disabled,
     /// Calibrate to top-left corner (0, 0)
     TopLeft,
     /// Calibrate to screen center (e.g. 1280, 720)
+    #[default]
     Center,
     /// Calibrate to custom coordinates (X, Y)
     Custom,
 }
 
-impl Default for AnchorMode {
-    fn default() -> Self {
-        AnchorMode::Center
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum AnchorMethod {
     /// Automatically try ydotool first, fall back to native uinput corner-slam
+    #[default]
     Auto,
     /// Use ydotool (ydotool mousemove -a X Y)
     Ydotool,
     /// Use native Linux /dev/uinput corner-slam + relative shift
     NativeUinput,
-}
-
-impl Default for AnchorMethod {
-    fn default() -> Self {
-        AnchorMethod::Auto
-    }
 }
 
 fn default_anchor_x() -> i32 {

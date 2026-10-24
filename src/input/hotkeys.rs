@@ -4,7 +4,7 @@ use evdev::Device;
 use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::thread::{self, JoinHandle};
 use tracing::{debug, error, info, warn};
 
@@ -13,10 +13,13 @@ pub enum HotkeyAction {
     RecordToggle,
     PlayToggle,
     PanicStop,
+    RawKeyPressed(u16),
 }
 
 pub struct HotkeyDaemonHandle {
     stop_flag: Arc<AtomicBool>,
+    capture_mode: Arc<AtomicBool>,
+    shared_config: Arc<RwLock<HotkeyConfig>>,
     join_handle: Option<JoinHandle<()>>,
 }
 
@@ -25,6 +28,17 @@ impl HotkeyDaemonHandle {
         self.stop_flag.store(true, Ordering::SeqCst);
         if let Some(h) = self.join_handle.take() {
             let _ = h.join();
+        }
+    }
+
+    pub fn set_capture_mode(&self, enabled: bool) {
+        self.capture_mode.store(enabled, Ordering::Relaxed);
+    }
+
+    pub fn update_config(&self, new_config: HotkeyConfig) {
+        if let Ok(mut lock) = self.shared_config.write() {
+            *lock = new_config;
+            info!("Hotkey daemon configuration updated dynamically");
         }
     }
 }
@@ -43,7 +57,12 @@ impl HotkeyDaemon {
         sender: crossbeam_channel::Sender<HotkeyAction>,
     ) -> Result<HotkeyDaemonHandle, String> {
         let stop_flag = Arc::new(AtomicBool::new(false));
+        let capture_mode = Arc::new(AtomicBool::new(false));
+        let shared_config = Arc::new(RwLock::new(config));
+
         let thread_stop = Arc::clone(&stop_flag);
+        let thread_capture = Arc::clone(&capture_mode);
+        let thread_config = Arc::clone(&shared_config);
 
         // Find all keyboard devices
         let keyboard_paths: Vec<PathBuf> = detect_devices()
@@ -59,12 +78,14 @@ impl HotkeyDaemon {
         let join_handle = thread::Builder::new()
             .name("microtask-hotkeys".to_string())
             .spawn(move || {
-                run_hotkey_loop(keyboard_paths, config, thread_stop, sender);
+                run_hotkey_loop(keyboard_paths, thread_config, thread_capture, thread_stop, sender);
             })
             .map_err(|e| format!("Failed to spawn hotkey daemon thread: {}", e))?;
 
         Ok(HotkeyDaemonHandle {
             stop_flag,
+            capture_mode,
+            shared_config,
             join_handle: Some(join_handle),
         })
     }
@@ -72,7 +93,8 @@ impl HotkeyDaemon {
 
 fn run_hotkey_loop(
     paths: Vec<PathBuf>,
-    config: HotkeyConfig,
+    shared_config: Arc<RwLock<HotkeyConfig>>,
+    capture_mode: Arc<AtomicBool>,
     stop_flag: Arc<AtomicBool>,
     sender: crossbeam_channel::Sender<HotkeyAction>,
 ) {
@@ -97,7 +119,7 @@ fn run_hotkey_loop(
     }
 
     info!(
-        "Global Hotkey Daemon running across {} keyboards (F9: Record, F10: Play, Pause/F12: Panic)",
+        "Global Hotkey Daemon running across {} keyboards (dynamic hotkey listener active)",
         devices.len()
     );
 
@@ -142,16 +164,29 @@ fn run_hotkey_loop(
                             // Key Press
                             let code = ev.code();
 
-                            // Check configured hotkeys
-                            if code == config.record_toggle_code {
+                            // If capturing hotkey for configuration, forward raw key
+                            if capture_mode.load(Ordering::Relaxed) {
+                                info!("Captured raw key code {} for hotkey configuration", code);
+                                let _ = sender.send(HotkeyAction::RawKeyPressed(code));
+                                continue;
+                            }
+
+                            // Dynamic hotkey check
+                            let (rec_code, play_code, panic_code) = if let Ok(cfg) = shared_config.read() {
+                                (cfg.record_toggle_code, cfg.play_toggle_code, cfg.panic_abort_code)
+                            } else {
+                                (67, 68, 119)
+                            };
+
+                            if code == rec_code {
                                 info!("Global hotkey: RECORD TOGGLE ({})", code);
                                 let _ = sender.send(HotkeyAction::RecordToggle);
-                            } else if code == config.play_toggle_code {
+                            } else if code == play_code {
                                 info!("Global hotkey: PLAY TOGGLE ({})", code);
                                 let _ = sender.send(HotkeyAction::PlayToggle);
-                            } else if code == config.panic_abort_code
-                                || (config.panic_abort_code == 119 && code == 88)
-                                || (config.panic_abort_code == 88 && code == 119)
+                            } else if code == panic_code
+                                || (panic_code == 119 && code == 88)
+                                || (panic_code == 88 && code == 119)
                             {
                                 info!("Global hotkey: PANIC STOP ({})", code);
                                 let _ = sender.send(HotkeyAction::PanicStop);
