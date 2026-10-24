@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=MicroTask
+GenericName=Macro Recorder & Player
+Comment=High-performance macro recorder and player for Linux & Wayland
+Exec=microtask
+Icon=microtask
+Terminal=false
+Type=Application
+Categories=Utility;Accessibility;
+Keywords=macro;recorder;player;wayland;uinput;automation;
+StartupNotify=true

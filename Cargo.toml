@@ -29,3 +29,23 @@ serde_json = "1.0.154"
 spin_sleep = "1.3.3"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[package.metadata.deb]
+maintainer = "Vortr3x <Vortr3x@users.noreply.github.com>"
+copyright = "2026, Vortr3x"
+license-file = ["LICENSE-MIT", "4"]
+extended-description = """\
+MicroTask is a lightweight macro recorder and player designed specifically \
+for Wayland (KDE Plasma, GNOME, Sway, Hyprland) and X11 Linux desktop environments."""
+depends = "$auto"
+section = "utils"
+priority = "optional"
+assets = [
+    ["target/release/microtask", "usr/bin/", "755"],
+    ["assets/microtask.desktop", "usr/share/applications/", "644"],
+    ["assets/microtask.png", "usr/share/icons/hicolor/256x256/apps/microtask.png", "644"],
+    ["assets/microtask.svg", "usr/share/icons/hicolor/scalable/apps/microtask.svg", "644"],
+    ["assets/99-uinput.rules", "usr/lib/udev/rules.d/", "644"],
+    ["README.md", "usr/share/doc/microtask/README.md", "644"],
+]
+

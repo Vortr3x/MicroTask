@@ -1,0 +1,2 @@
+# udev rule to allow users in the 'input' group to access /dev/uinput
+KERNEL=="uinput", MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"

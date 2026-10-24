@@ -51,6 +51,23 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 
 Log out and log back in for group membership changes to take effect.
 
+## Installation
+
+### Arch Linux (AUR)
+
+```bash
+paru -S microtask
+# or using yay
+yay -S microtask
+```
+
+### Prebuilt Packages (.deb, .AppImage, tarball)
+
+Download the latest packages from [GitHub Releases](https://github.com/Vortr3x/MicroTask/releases):
+- **AppImage**: Standalone executable for any modern Linux distribution.
+- **Debian / Ubuntu**: `.deb` package.
+- **Standalone Archive**: `.tar.gz` with binary, desktop entry, icon, and udev rules.
+
 ## Building and Running
 
 ### Prerequisites

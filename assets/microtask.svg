@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+    <linearGradient id="circleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f43f5e"/>
+      <stop offset="100%" stop-color="#e11d48"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle -->
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#bgGrad)" stroke="#1e293b" stroke-width="4"/>
+
+  <!-- Subtle glow backdrop -->
+  <circle cx="128" cy="128" r="70" fill="url(#accentGrad)" opacity="0.15" filter="url(#glow)"/>
+
+  <!-- Macro Loop Arrow (Infinity / Repeat Loop) -->
+  <path d="M 76 100 C 60 100, 48 112, 48 128 C 48 144, 60 156, 76 156 C 104 156, 120 100, 148 100 C 164 100, 176 112, 176 128 C 176 144, 164 156, 148 156 C 120 156, 104 100, 76 100 Z"
+        fill="none" stroke="url(#accentGrad)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Directional arrow head on loop -->
+  <polygon points="156,86 172,102 144,106" fill="#818cf8"/>
+
+  <!-- Cursor Pointer Symbol inside right loop -->
+  <path d="M 172 136 L 204 196 L 190 202 L 176 174 L 158 190 Z" fill="#38bdf8" filter="url(#glow)"/>
+
+  <!-- Active Recording / Core Point (Red Pulse Dot) -->
+  <circle cx="76" cy="128" r="14" fill="url(#circleGrad)" filter="url(#glow)"/>
+  <circle cx="76" cy="128" r="6" fill="#ffffff"/>
+</svg>

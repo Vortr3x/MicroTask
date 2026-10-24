@@ -1,0 +1,28 @@
+# Maintainer: Vortr3x <Vortr3x@users.noreply.github.com>
+pkgname=microtask-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Native Wayland and Linux macro recorder and player in Rust (precompiled binary)"
+arch=('x86_64')
+url="https://github.com/Vortr3x/MicroTask"
+license=('MIT' 'Apache-2.0')
+depends=('gcc-libs' 'glibc' 'libxkbcommon' 'wayland')
+optdepends=(
+    'ydotool: Alternative cursor teleportation engine'
+)
+provides=('microtask')
+conflicts=('microtask')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Vortr3x/MicroTask/releases/download/v$pkgver/microtask-v$pkgver-x86_64-linux.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+    cd "microtask-v$pkgver-x86_64-linux"
+    install -Dm755 "microtask" "$pkgdir/usr/bin/microtask"
+    install -Dm644 "microtask.desktop" "$pkgdir/usr/share/applications/microtask.desktop"
+    install -Dm644 "microtask.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/microtask.png"
+    install -Dm644 "microtask.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/microtask.svg"
+    install -Dm644 "99-uinput.rules" "$pkgdir/usr/lib/udev/rules.d/99-uinput.rules"
+    install -Dm644 "README.md" "$pkgdir/usr/share/doc/microtask/README.md"
+    install -Dm644 "LICENSE-MIT" "$pkgdir/usr/share/licenses/microtask/LICENSE-MIT"
+    install -Dm644 "LICENSE-APACHE" "$pkgdir/usr/share/licenses/microtask/LICENSE-APACHE"
+}
