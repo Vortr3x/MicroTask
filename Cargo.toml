@@ -1,6 +1,6 @@
 [package]
 name = "microtask"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Vortr3x"]
 description = "Native Wayland and Linux macro recorder and player in Rust"

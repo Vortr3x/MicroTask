@@ -355,6 +355,16 @@ impl MicroTaskApp {
             self.macro_data.normalize_timestamps();
             self.state = EngineState::Idle;
             self.recording_start = None;
+
+            // Return cursor to starting anchor position after recording completes
+            if self.playback_config.anchor_on_record && self.playback_config.anchor_mode != AnchorMode::Disabled {
+                let (target_x, target_y) = self.get_anchor_coordinates();
+                info!("Returning cursor to anchor ({}, {}) on recording stop", target_x, target_y);
+                if let Err(e) = position_cursor(target_x, target_y, self.playback_config.anchor_method) {
+                    warn!("Failed to return cursor to anchor on recording stop: {}", e);
+                }
+            }
+
             let anchor_info = if let (Some(x), Some(y)) = (self.macro_data.metadata.anchor_x, self.macro_data.metadata.anchor_y) {
                 format!(" Anchor: ({}, {}).", x, y)
             } else {
@@ -1668,7 +1678,7 @@ impl MicroTaskApp {
     fn render_footer(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("⚡ MicroTask v0.1.0")
+                RichText::new(format!("⚡ MicroTask v{}", env!("CARGO_PKG_VERSION")))
                     .size(11.0)
                     .strong()
                     .color(Color32::from_rgb(140, 148, 162)),

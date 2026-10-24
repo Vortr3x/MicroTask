@@ -135,7 +135,7 @@ pub fn position_cursor(target_x: i32, target_y: i32, method: AnchorMethod) -> Re
 fn run_ydotool_anchor(target_x: i32, target_y: i32) -> Result<(), String> {
     // 1. Slam to top-left (0, 0) using massive negative relative offset
     let slam_output = Command::new("ydotool")
-        .args(["mousemove", "-x", "-9999", "-y", "-9999"])
+        .args(["mousemove", "--", "-9999", "-9999"])
         .output()
         .map_err(|e| format!("Failed to spawn ydotool: {}", e))?;
 
@@ -162,7 +162,7 @@ fn run_ydotool_anchor(target_x: i32, target_y: i32) -> Result<(), String> {
                 let dx = if diff_x.abs() <= 4 { diff_x } else { diff_x / 2 };
                 let dy = if diff_y.abs() <= 4 { diff_y } else { diff_y / 2 };
                 let _ = Command::new("ydotool")
-                    .args(["mousemove", "-x", &dx.to_string(), "-y", &dy.to_string()])
+                    .args(["mousemove", "--", &dx.to_string(), &dy.to_string()])
                     .output();
                 sleep(Duration::from_millis(25));
             }
@@ -174,7 +174,7 @@ fn run_ydotool_anchor(target_x: i32, target_y: i32) -> Result<(), String> {
     let step_x = target_x / 2;
     let step_y = target_y / 2;
     let move_output = Command::new("ydotool")
-        .args(["mousemove", "-x", &step_x.to_string(), "-y", &step_y.to_string()])
+        .args(["mousemove", "--", &step_x.to_string(), &step_y.to_string()])
         .output()
         .map_err(|e| format!("Failed to spawn ydotool offset: {}", e))?;
 

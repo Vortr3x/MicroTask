@@ -114,33 +114,7 @@ fn run_playback_engine(
     };
 
     // Synchronize starting cursor position before replaying events
-    if config.anchor_on_playback && config.anchor_mode != AnchorMode::Disabled {
-        let (target_x, target_y) = resolve_anchor_coordinates(
-            config.anchor_mode,
-            config.anchor_x,
-            config.anchor_y,
-        );
-        info!(
-            "Playback cursor anchor: positioning to ({}, {}) via {:?}",
-            target_x, target_y, config.anchor_method
-        );
-        if let Err(e) = position_cursor(target_x, target_y, config.anchor_method) {
-            warn!("Playback starting anchor positioning error: {}", e);
-        }
-        if config.anchor_settle_delay_ms > 0 {
-            sleep(Duration::from_millis(config.anchor_settle_delay_ms));
-        }
-    } else if config.corner_anchor {
-        // Legacy fallback
-        info!("Wayland corner anchor enabled: resetting cursor to (0, 0)");
-        if let Err(e) = emitter.anchor_cursor_to_top_left(
-            config.anchor_burst_count,
-            config.anchor_burst_step,
-            config.anchor_burst_delay_ms,
-        ) {
-            warn!("Corner anchor error: {}", e);
-        }
-    }
+    apply_cursor_anchor(&config, &mut emitter);
 
     let speed = (config.speed_multiplier as f64).clamp(0.1, 50.0);
     let total_events = events.len();
@@ -220,6 +194,11 @@ fn run_playback_engine(
             );
         }
 
+        // Return cursor to starting anchor at the end of each macro repetition cycle ("в конце записи")
+        if !stop_flag.load(Ordering::Relaxed) {
+            apply_cursor_anchor(&config, &mut emitter);
+        }
+
         // Delay between repetitions
         if config.loop_delay_ms > 0 {
             let delay = Duration::from_millis(config.loop_delay_ms);
@@ -281,3 +260,34 @@ fn send_progress(
         let _ = s.try_send(prog);
     }
 }
+
+/// Teleports/re-anchors the desktop mouse cursor according to PlaybackConfig
+fn apply_cursor_anchor(config: &PlaybackConfig, emitter: &mut UinputEmitter) {
+    if config.anchor_on_playback && config.anchor_mode != AnchorMode::Disabled {
+        let (target_x, target_y) = resolve_anchor_coordinates(
+            config.anchor_mode,
+            config.anchor_x,
+            config.anchor_y,
+        );
+        info!(
+            "Playback cursor anchor: positioning to ({}, {}) via {:?}",
+            target_x, target_y, config.anchor_method
+        );
+        if let Err(e) = position_cursor(target_x, target_y, config.anchor_method) {
+            warn!("Playback anchor positioning error: {}", e);
+        }
+        if config.anchor_settle_delay_ms > 0 {
+            sleep(Duration::from_millis(config.anchor_settle_delay_ms));
+        }
+    } else if config.corner_anchor {
+        info!("Wayland corner anchor enabled: resetting cursor to (0, 0)");
+        if let Err(e) = emitter.anchor_cursor_to_top_left(
+            config.anchor_burst_count,
+            config.anchor_burst_step,
+            config.anchor_burst_delay_ms,
+        ) {
+            warn!("Corner anchor error: {}", e);
+        }
+    }
+}
+

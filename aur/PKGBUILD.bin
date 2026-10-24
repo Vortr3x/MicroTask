@@ -1,6 +1,6 @@
 # Maintainer: Vortr3x <Vortr3x@users.noreply.github.com>
 pkgname=microtask-bin
-pkgver=0.1.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc="Native Wayland and Linux macro recorder and player in Rust (precompiled binary)"
 arch=('x86_64')
