@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Package (Linux x86_64)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwayland-dev libxkbcommon-dev file
+
+      - name: Build Release Binary
+        run: cargo build --release --locked
+
+      - name: Extract Version Tag
+        id: vars
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+            echo "TAG_NAME=v${VERSION}" >> $GITHUB_OUTPUT
+            echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Package Standalone Tarball (.tar.gz)
+        run: |
+          TAG="${{ steps.vars.outputs.TAG_NAME }}"
+          ARCHIVE_DIR="microtask-${TAG}-x86_64-linux"
+          mkdir -p "$ARCHIVE_DIR"
+          cp target/release/microtask "$ARCHIVE_DIR/"
+          cp assets/microtask.desktop "$ARCHIVE_DIR/"
+          cp assets/microtask.png "$ARCHIVE_DIR/"
+          cp assets/microtask.svg "$ARCHIVE_DIR/"
+          cp assets/99-uinput.rules "$ARCHIVE_DIR/"
+          cp README.md "$ARCHIVE_DIR/"
+          cp LICENSE-MIT "$ARCHIVE_DIR/"
+          cp LICENSE-APACHE "$ARCHIVE_DIR/"
+          tar -czvf "${ARCHIVE_DIR}.tar.gz" "$ARCHIVE_DIR"
+          echo "TARBALL=${ARCHIVE_DIR}.tar.gz" >> $GITHUB_ENV
+
+      - name: Build Debian Package (.deb)
+        run: |
+          cargo install cargo-deb --locked
+          cargo deb --no-build
+          DEB_FILE=$(ls target/debian/*.deb | head -n 1)
+          cp "$DEB_FILE" ./
+          echo "DEB_PACKAGE=$(basename "$DEB_FILE")" >> $GITHUB_ENV
+
+      - name: Build AppImage (.AppImage)
+        run: |
+          # Download and extract appimagetool
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+          ./appimagetool --appimage-extract > /dev/null
+          mv squashfs-root appimagetool.AppDir
+
+          # Setup AppDir
+          mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps AppDir/usr/lib/udev/rules.d
+          cp target/release/microtask AppDir/usr/bin/
+          cp assets/microtask.desktop AppDir/
+          cp assets/microtask.png AppDir/
+          cp assets/microtask.png AppDir/usr/share/icons/hicolor/256x256/apps/
+          cp assets/99-uinput.rules AppDir/usr/lib/udev/rules.d/
+
+          cat << 'EOF' > AppDir/AppRun
+#!/bin/sh
+HERE="$(dirname "$(readlink -f "${0}")")"
+exec "${HERE}/usr/bin/microtask" "$@"
+EOF
+          chmod +x AppDir/AppRun
+
+          # Build AppImage
+          ARCH=x86_64 ./appimagetool.AppDir/AppRun AppDir MicroTask-x86_64.AppImage
+
+      - name: Generate Checksums
+        run: |
+          sha256sum ${{ env.TARBALL }} ${{ env.DEB_PACKAGE }} MicroTask-x86_64.AppImage > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          name: "MicroTask ${{ steps.vars.outputs.TAG_NAME }}"
+          tag_name: ${{ steps.vars.outputs.TAG_NAME }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            ${{ env.TARBALL }}
+            ${{ env.DEB_PACKAGE }}
+            MicroTask-x86_64.AppImage
+            SHA256SUMS.txt
