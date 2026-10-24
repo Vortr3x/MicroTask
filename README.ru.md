@@ -53,14 +53,6 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 
 ## Установка
 
-### Arch Linux (AUR)
-
-```bash
-paru -S microtask
-# или через yay
-yay -S microtask
-```
-
 ### Готовые пакеты (.deb, .AppImage, tarball)
 
 Скачайте свежие сборки на странице [GitHub Releases](https://github.com/Vortr3x/MicroTask/releases):

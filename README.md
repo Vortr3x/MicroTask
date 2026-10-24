@@ -53,14 +53,6 @@ Log out and log back in for group membership changes to take effect.
 
 ## Installation
 
-### Arch Linux (AUR)
-
-```bash
-paru -S microtask
-# or using yay
-yay -S microtask
-```
-
 ### Prebuilt Packages (.deb, .AppImage, tarball)
 
 Download the latest packages from [GitHub Releases](https://github.com/Vortr3x/MicroTask/releases):

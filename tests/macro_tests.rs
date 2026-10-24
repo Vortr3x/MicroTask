@@ -111,8 +111,8 @@ fn test_device_detection() {
 fn test_permissions_check() {
     let status = check_permissions();
     println!("Permissions status: {:?}", status);
-    if std::env::var("CI").is_ok() && !status.uinput_accessible {
-        println!("Running in CI without /dev/uinput permissions - skipping assertion");
+    if std::env::var("CI").is_ok() {
+        println!("Running in CI - skipping physical device permission assertion");
         return;
     }
     assert!(status.uinput_accessible, "/dev/uinput should be accessible");
